@@ -57,6 +57,11 @@ jobs:
           grep -q 'class LocalClassifier' "$JAVA_DIR/LocalClassifier.java"
           grep -q "versionName '0.4.0'" buildsrc/SidePanelOrganizer/app/build.gradle
 
+      - name: Package repaired source
+        run: |
+          cd buildsrc
+          zip -qr ../SidePanelOrganizer-v0.4-repaired-source.zip SidePanelOrganizer
+
       - name: Build debug APK
         working-directory: buildsrc/SidePanelOrganizer
         run: gradle --no-daemon assembleDebug
@@ -73,4 +78,11 @@ jobs:
         with:
           name: SidePanelOrganizer-v0.4-app-and-file-ai-apk
           path: buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload repaired source
+        uses: actions/upload-artifact@v4
+        with:
+          name: SidePanelOrganizer-v0.4-repaired-source
+          path: SidePanelOrganizer-v0.4-repaired-source.zip
           if-no-files-found: error
