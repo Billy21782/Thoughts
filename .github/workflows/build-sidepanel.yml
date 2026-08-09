@@ -50,7 +50,7 @@ jobs:
           base64 --decode patch_v03/LocalClassifier.java.gz.b64 | gzip -d > "$JAVA_DIR/LocalClassifier.java"
 
           base64 --decode patch_v05/personalized-v05.patch.gz.b64 | gzip -d > personalized-v05.patch
-          patch -p1 -d buildsrc/SidePanelOrganizer < personalized-v05.patch
+          patch -p2 -d buildsrc/SidePanelOrganizer < personalized-v05.patch
 
           sed -i 's/compileSdk 37/compileSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
           sed -i 's/targetSdk 37/targetSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
