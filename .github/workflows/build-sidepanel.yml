@@ -6,6 +6,7 @@ on:
       - side-panel-build
       - side-panel-ai-sorter
       - side-panel-app-ai
+      - side-panel-personalized-ai
   pull_request:
     branches:
       - main
@@ -37,11 +38,10 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
-      - name: Reconstruct v0.4 source
+      - name: Reconstruct and personalize v0.5 source
         run: |
           cat source_v04/chunk_* > SidePanelSource.b64
           base64 --decode SidePanelSource.b64 > SidePanelSource.zip
-          sha256sum SidePanelSource.zip
           rm -rf buildsrc
           mkdir buildsrc
           unzip -q SidePanelSource.zip -d buildsrc || true
@@ -49,18 +49,26 @@ jobs:
           JAVA_DIR="buildsrc/SidePanelOrganizer/app/src/main/java/com/jacobfloorcover/sidepanelorganizer"
           base64 --decode patch_v03/LocalClassifier.java.gz.b64 | gzip -d > "$JAVA_DIR/LocalClassifier.java"
 
+          base64 --decode patch_v05/personalized-v05.patch.gz.b64 | gzip -d > personalized-v05.patch
+          patch -p1 -d buildsrc/SidePanelOrganizer < personalized-v05.patch
+
           sed -i 's/compileSdk 37/compileSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
           sed -i 's/targetSdk 37/targetSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
-          grep -q 'AI App Sorter' "$JAVA_DIR/AppSorterActivity.java"
-          grep -q 'class AppClassifier' "$JAVA_DIR/AppClassifier.java"
-          grep -q 'AI File Sorter' "$JAVA_DIR/FileSorterActivity.java"
-          grep -q 'class LocalClassifier' "$JAVA_DIR/LocalClassifier.java"
-          grep -q "versionName '0.4.0'" buildsrc/SidePanelOrganizer/app/build.gradle
 
-      - name: Package repaired source
+          grep -q "versionName '0.5.0'" buildsrc/SidePanelOrganizer/app/build.gradle
+          grep -q 'JFC Work' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'Leads & Jobs' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'Materials & Shopping' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'Business Communication' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'your work profile: used to find jobs / leads' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'migratePersonalAppProfile' "$JAVA_DIR/MainActivity.java"
+          grep -q 'ensurePersonalProfileCategories' "$JAVA_DIR/AppSorterActivity.java"
+          grep -q 'AI File Sorter' "$JAVA_DIR/FileSorterActivity.java"
+
+      - name: Package v0.5 source
         run: |
           cd buildsrc
-          zip -qr ../SidePanelOrganizer-v0.4-repaired-source.zip SidePanelOrganizer
+          zip -qr ../SidePanelOrganizer-v0.5-personalized-source.zip SidePanelOrganizer
 
       - name: Build debug APK
         working-directory: buildsrc/SidePanelOrganizer
@@ -76,13 +84,13 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: SidePanelOrganizer-v0.4-app-and-file-ai-apk
+          name: SidePanelOrganizer-v0.5-personalized-ai-apk
           path: buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Upload repaired source
+      - name: Upload source
         uses: actions/upload-artifact@v4
         with:
-          name: SidePanelOrganizer-v0.4-repaired-source
-          path: SidePanelOrganizer-v0.4-repaired-source.zip
+          name: SidePanelOrganizer-v0.5-personalized-source
+          path: SidePanelOrganizer-v0.5-personalized-source.zip
           if-no-files-found: error
