@@ -35,17 +35,27 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
-      - name: Extract source
+      - name: Reconstruct and extract source
         run: |
+          cat source_chunks/chunk_* > SidePanelSource.b64
+          base64 --decode SidePanelSource.b64 > SidePanelSource.zip
+          echo "3b683eb0251d9ed7ca0869387c348f3b9712fcf57217e9684c53ff639e5bebb7  SidePanelSource.zip" | sha256sum -c -
+          unzip -t SidePanelSource.zip
           rm -rf buildsrc
           mkdir buildsrc
-          unzip -q SidePanelOrganizer-v0.2-panels-style-source.zip -d buildsrc
+          unzip -q SidePanelSource.zip -d buildsrc
           sed -i 's/compileSdk 37/compileSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
           sed -i 's/targetSdk 37/targetSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
 
       - name: Build debug APK
         working-directory: buildsrc/SidePanelOrganizer
         run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK
+        run: |
+          test -s buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
