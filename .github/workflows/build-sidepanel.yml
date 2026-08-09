@@ -1,0 +1,98 @@
+name: Build SidePanel APK
+
+on:
+  push:
+    branches:
+      - side-panel-build
+      - side-panel-ai-sorter
+      - side-panel-app-ai
+      - side-panel-personalized-ai
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Reconstruct and personalize v0.5 source
+        run: |
+          cat source_v04/chunk_* > SidePanelSource.b64
+          base64 --decode SidePanelSource.b64 > SidePanelSource.zip
+          rm -rf buildsrc
+          mkdir buildsrc
+          unzip -q SidePanelSource.zip -d buildsrc || true
+
+          JAVA_DIR="buildsrc/SidePanelOrganizer/app/src/main/java/com/jacobfloorcover/sidepanelorganizer"
+          base64 --decode patch_v03/LocalClassifier.java.gz.b64 | gzip -d > "$JAVA_DIR/LocalClassifier.java"
+
+          base64 --decode patch_v05/personalized-v05.patch.gz.b64 | gzip -d > personalized-v05.patch
+          patch -p2 -d buildsrc/SidePanelOrganizer < personalized-v05.patch || true
+
+          sed -i 's/compileSdk 37/compileSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
+          sed -i 's/targetSdk 37/targetSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
+          sed -i 's/versionCode 4/versionCode 5/' buildsrc/SidePanelOrganizer/app/build.gradle
+          sed -i "s/versionName '0.4.0'/versionName '0.5.0'/" buildsrc/SidePanelOrganizer/app/build.gradle
+
+          grep -q "versionName '0.5.0'" buildsrc/SidePanelOrganizer/app/build.gradle
+          grep -q 'JFC Work' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'Leads & Jobs' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'Materials & Shopping' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'Business Communication' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'your work profile: used to find jobs / leads' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'migratePersonalAppProfile' "$JAVA_DIR/MainActivity.java"
+          grep -q 'ensurePersonalProfileCategories' "$JAVA_DIR/AppSorterActivity.java"
+          grep -q 'AI File Sorter' "$JAVA_DIR/FileSorterActivity.java"
+
+      - name: Package v0.5 source
+        run: |
+          cd buildsrc
+          zip -qr ../SidePanelOrganizer-v0.5-personalized-source.zip SidePanelOrganizer
+
+      - name: Build debug APK
+        working-directory: buildsrc/SidePanelOrganizer
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK
+        run: |
+          APK=buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          sha256sum "$APK"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SidePanelOrganizer-v0.5-personalized-ai-apk
+          path: buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload source
+        uses: actions/upload-artifact@v4
+        with:
+          name: SidePanelOrganizer-v0.5-personalized-source
+          path: SidePanelOrganizer-v0.5-personalized-source.zip
+          if-no-files-found: error
