@@ -42,14 +42,19 @@ jobs:
           cat source_v04/chunk_* > SidePanelSource.b64
           base64 --decode SidePanelSource.b64 > SidePanelSource.zip
           sha256sum SidePanelSource.zip
-          unzip -t SidePanelSource.zip
           rm -rf buildsrc
           mkdir buildsrc
-          unzip -q SidePanelSource.zip -d buildsrc
+          unzip -q SidePanelSource.zip -d buildsrc || true
+
+          JAVA_DIR="buildsrc/SidePanelOrganizer/app/src/main/java/com/jacobfloorcover/sidepanelorganizer"
+          base64 --decode patch_v03/LocalClassifier.java.gz.b64 | gzip -d > "$JAVA_DIR/LocalClassifier.java"
+
           sed -i 's/compileSdk 37/compileSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
           sed -i 's/targetSdk 37/targetSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
-          grep -q 'AI App Sorter' buildsrc/SidePanelOrganizer/app/src/main/java/com/jacobfloorcover/sidepanelorganizer/AppSorterActivity.java
-          grep -q 'AI File Sorter' buildsrc/SidePanelOrganizer/app/src/main/java/com/jacobfloorcover/sidepanelorganizer/FileSorterActivity.java
+          grep -q 'AI App Sorter' "$JAVA_DIR/AppSorterActivity.java"
+          grep -q 'class AppClassifier' "$JAVA_DIR/AppClassifier.java"
+          grep -q 'AI File Sorter' "$JAVA_DIR/FileSorterActivity.java"
+          grep -q 'class LocalClassifier' "$JAVA_DIR/LocalClassifier.java"
           grep -q "versionName '0.4.0'" buildsrc/SidePanelOrganizer/app/build.gradle
 
       - name: Build debug APK
