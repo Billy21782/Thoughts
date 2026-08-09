@@ -1,0 +1,65 @@
+name: Build SidePanel APK
+
+on:
+  push:
+    branches:
+      - side-panel-build
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.5.0'
+
+      - name: Reconstruct and extract source
+        run: |
+          cat source_chunks/chunk_* > SidePanelSource.b64
+          base64 --decode SidePanelSource.b64 > SidePanelSource.zip
+          echo "3b683eb0251d9ed7ca0869387c348f3b9712fcf57217e9684c53ff639e5bebb7  SidePanelSource.zip" | sha256sum -c -
+          unzip -t SidePanelSource.zip
+          rm -rf buildsrc
+          mkdir buildsrc
+          unzip -q SidePanelSource.zip -d buildsrc
+          sed -i 's/compileSdk 37/compileSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
+          sed -i 's/targetSdk 37/targetSdk 36/' buildsrc/SidePanelOrganizer/app/build.gradle
+
+      - name: Build debug APK
+        working-directory: buildsrc/SidePanelOrganizer
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK
+        run: |
+          test -s buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          unzip -t buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SidePanelOrganizer-debug-apk
+          path: buildsrc/SidePanelOrganizer/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
